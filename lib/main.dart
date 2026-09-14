@@ -1,6 +1,8 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:http/http.dart' as http;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,6 +36,16 @@ class RadioStation {
   final String genre;
 
   RadioStation({required this.name, required this.url, required this.genre});
+
+  factory RadioStation.fromJson(Map<String, dynamic> json) {
+    return RadioStation(
+      name: json['name'] ?? 'Bilinmeyen Radyo',
+      url: json['url_resolved'] ?? json['url'] ?? '',
+      genre: (json['tags'] != null && json['tags'].toString().isNotEmpty)
+          ? json['tags'].toString().split(',').first
+          : 'Genel',
+    );
+  }
 }
 
 class RetroAmpPlayer extends StatefulWidget {
@@ -49,25 +61,12 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
   bool _isBannerAdLoaded = false;
   bool _isPlaying = false;
   bool _isLoading = false;
+  bool _isFetchingStations = true;
   int _selectedStationIndex = 0;
 
-  final List<RadioStation> _stations = [
-    RadioStation(
-      name: 'Retro Hits',
-      url: 'https://stream.zeno.fm/f3wvbbqmdg8uv',
-      genre: '80s & 90s Pop',
-    ),
-    RadioStation(
-      name: 'Rock Classics',
-      url: 'https://stream.zeno.fm/0r0xa792kwzuv',
-      genre: 'Classic Rock',
-    ),
-    RadioStation(
-      name: 'Jazz & Lounge',
-      url: 'https://stream.zeno.fm/64ub8y33q8quv',
-      genre: 'Smooth Jazz',
-    ),
-  ];
+  List<RadioStation> _stations = [];
+  List<RadioStation> _filteredStations = [];
+  final TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
@@ -75,6 +74,7 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
     _audioPlayer = AudioPlayer();
     _initAudioPlayer();
     _loadBannerAd();
+    _fetchRadioStations();
   }
 
   void _initAudioPlayer() {
@@ -89,9 +89,53 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
     });
   }
 
+  // Radio Browser API üzerinden Türkiye radyolarını çekme
+  Future<void> _fetchRadioStations() async {
+    final url = Uri.parse(
+        'https://de1.api.radio-browser.info/json/stations/bycountry/turkey?limit=50&order=votes&reverse=true');
+    try {
+      final response = await http.get(url);
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        final fetched = data
+            .map((item) => RadioStation.fromJson(item))
+            .where((station) => station.url.isNotEmpty)
+            .toList();
+
+        setState(() {
+          _stations = fetched;
+          _filteredStations = fetched;
+          _isFetchingStations = false;
+        });
+      } else {
+        throw Exception('Radyolar yüklenemedi');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isFetchingStations = false;
+        });
+      }
+    }
+  }
+
+  void _filterStations(String query) {
+    setState(() {
+      if (query.isEmpty) {
+        _filteredStations = _stations;
+      } else {
+        _filteredStations = _stations
+            .where((station) =>
+                station.name.toLowerCase().contains(query.toLowerCase()) ||
+                station.genre.toLowerCase().contains(query.toLowerCase()))
+            .toList();
+      }
+    });
+  }
+
   void _loadBannerAd() {
     _bannerAd = BannerAd(
-      adUnitId: 'ca-app-pub-3940256099942544/6300978111', // Test Banner ID
+      adUnitId: 'ca-app-pub-3940256099942544/6300978111',
       size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(
@@ -109,12 +153,13 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
   }
 
   Future<void> _playStation(int index) async {
+    if (_filteredStations.isEmpty) return;
     try {
       setState(() {
         _selectedStationIndex = index;
         _isLoading = true;
       });
-      await _audioPlayer.setUrl(_stations[index].url);
+      await _audioPlayer.setUrl(_filteredStations[index].url);
       await _audioPlayer.play();
     } catch (e) {
       if (mounted) {
@@ -129,7 +174,7 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
     if (_isPlaying) {
       await _audioPlayer.pause();
     } else {
-      if (_audioPlayer.audioSource == null) {
+      if (_audioPlayer.audioSource == null && _filteredStations.isNotEmpty) {
         await _playStation(_selectedStationIndex);
       } else {
         await _audioPlayer.play();
@@ -141,12 +186,16 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
   void dispose() {
     _audioPlayer.dispose();
     _bannerAd?.dispose();
+    _searchController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentStation = _stations[_selectedStationIndex];
+    final currentStation = _filteredStations.isNotEmpty &&
+            _selectedStationIndex < _filteredStations.length
+        ? _filteredStations[_selectedStationIndex]
+        : null;
 
     return Scaffold(
       appBar: AppBar(
@@ -168,7 +217,6 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Retro Display Box
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
@@ -186,24 +234,23 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
                     child: Column(
                       children: [
                         Text(
-                          currentStation.name,
+                          currentStation?.name ?? 'Radyo Seçilmedi',
                           style: const TextStyle(
                             color: Color(0xFF39FF14),
-                            fontSize: 26,
+                            fontSize: 22,
                             fontWeight: FontWeight.bold,
                           ),
                           textAlign: TextAlign.center,
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          currentStation.genre,
+                          currentStation?.genre ?? '-',
                           style: const TextStyle(
                             color: Colors.white70,
-                            fontSize: 16,
+                            fontSize: 14,
                           ),
                         ),
                         const SizedBox(height: 20),
-                        // Equalizer Visual Simulation
                         Row(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: List.generate(8, (i) {
@@ -224,25 +271,25 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 40),
-                  // Control Buttons
+                  const SizedBox(height: 24),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       IconButton(
-                        iconSize: 48,
+                        iconSize: 40,
                         icon: const Icon(Icons.skip_previous, color: Colors.white),
                         onPressed: () {
-                          int prevIndex = (_selectedStationIndex - 1 + _stations.length) %
-                              _stations.length;
+                          if (_filteredStations.isEmpty) return;
+                          int prevIndex = (_selectedStationIndex - 1 + _filteredStations.length) %
+                              _filteredStations.length;
                           _playStation(prevIndex);
                         },
                       ),
-                      const SizedBox(width: 20),
+                      const SizedBox(width: 16),
                       ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           shape: const CircleBorder(),
-                          padding: const EdgeInsets.all(24),
+                          padding: const EdgeInsets.all(20),
                           backgroundColor: const Color(0xFFFFBF00),
                           foregroundColor: Colors.black,
                         ),
@@ -251,15 +298,16 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
                             ? const CircularProgressIndicator(color: Colors.black)
                             : Icon(
                                 _isPlaying ? Icons.pause : Icons.play_arrow,
-                                size: 40,
+                                size: 36,
                               ),
                       ),
-                      const SizedBox(width: 20),
+                      const SizedBox(width: 16),
                       IconButton(
-                        iconSize: 48,
+                        iconSize: 40,
                         icon: const Icon(Icons.skip_next, color: Colors.white),
                         onPressed: () {
-                          int nextIndex = (_selectedStationIndex + 1) % _stations.length;
+                          if (_filteredStations.isEmpty) return;
+                          int nextIndex = (_selectedStationIndex + 1) % _filteredStations.length;
                           _playStation(nextIndex);
                         },
                       ),
@@ -269,36 +317,56 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
               ),
             ),
           ),
-          // Station List
-          Container(
-            height: 150,
-            color: const Color(0xFF121216),
-            child: ListView.builder(
-              itemCount: _stations.length,
-              itemBuilder: (context, index) {
-                final station = _stations[index];
-                final isSelected = index == _selectedStationIndex;
-                return ListTile(
-                  selected: isSelected,
-                  selectedTileColor: const Color(0xFF2A2A35),
-                  leading: Icon(
-                    Icons.radio,
-                    color: isSelected ? const Color(0xFFFFBF00) : Colors.grey,
-                  ),
-                  title: Text(
-                    station.name,
-                    style: TextStyle(
-                      color: isSelected ? const Color(0xFFFFBF00) : Colors.white,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                    ),
-                  ),
-                  subtitle: Text(station.genre, style: const TextStyle(color: Colors.grey)),
-                  onTap: () => _playStation(index),
-                );
-              },
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 4.0),
+            child: TextField(
+              controller: _searchController,
+              onChanged: _filterStations,
+              decoration: InputDecoration(
+                hintText: 'Radyo Arayın...',
+                prefixIcon: const Icon(Icons.search, color: Color(0xFFFFBF00)),
+                filled: true,
+                fillColor: const Color(0xFF121216),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                  borderSide: BorderSide.none,
+                ),
+              ),
             ),
           ),
-          // AdMob Banner
+          Container(
+            height: 180,
+            color: const Color(0xFF121216),
+            child: _isFetchingStations
+                ? const Center(child: CircularProgressIndicator(color: Color(0xFFFFBF00)))
+                : _filteredStations.isEmpty
+                    ? const Center(child: Text('Radyo bulunamadı'))
+                    : ListView.builder(
+                        itemCount: _filteredStations.length,
+                        itemBuilder: (context, index) {
+                          final station = _filteredStations[index];
+                          final isSelected = index == _selectedStationIndex;
+                          return ListTile(
+                            selected: isSelected,
+                            selectedTileColor: const Color(0xFF2A2A35),
+                            leading: Icon(
+                              Icons.radio,
+                              color: isSelected ? const Color(0xFFFFBF00) : Colors.grey,
+                            ),
+                            title: Text(
+                              station.name,
+                              style: TextStyle(
+                                color: isSelected ? const Color(0xFFFFBF00) : Colors.white,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                              ),
+                            ),
+                            subtitle: Text(station.genre,
+                                style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                            onTap: () => _playStation(index),
+                          );
+                        },
+                      ),
+          ),
           if (_isBannerAdLoaded && _bannerAd != null)
             SizedBox(
               width: _bannerAd!.size.width.toDouble(),
