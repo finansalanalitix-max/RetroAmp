@@ -34,6 +34,10 @@ jobs:
           rm -rf android
           flutter create . --platforms=android --org=com.retroamp --project-name=retroamp
 
+      # Python Pillow kütüphanesini yükler
+      - name: Install Python Pillow
+        run: python3 -m pip install Pillow
+
       # RetroAmp İkonunu (Amber/Yeşil Equalizer Piksel Görseli) Otomatik Oluşturur
       - name: Generate Retro Dynamic Launcher Icon
         run: |
