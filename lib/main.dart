@@ -63,14 +63,46 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
   bool _isBannerAdLoaded = false;
   bool _isPlaying = false;
   bool _isLoading = false;
-  bool _isFetchingStations = true;
   int _selectedStationIndex = 0;
+
+  // Varsayılan / Standart Yayın Yapan Radyolar
+  final List<RadioStation> _defaultStations = [
+    RadioStation(
+      name: 'Power FM',
+      url: 'https://powerfm.listenpowerapp.com/powerfm/mpeg/icecast.audio',
+      genre: 'Pop / Dance',
+    ),
+    RadioStation(
+      name: 'Kral FM',
+      url: 'https://kralfm.listenpowerapp.com/kralfm/mpeg/icecast.audio',
+      genre: 'Arabesk',
+    ),
+    RadioStation(
+      name: 'Süper FM',
+      url: 'https://17733.live.streamtheworld.com/SUPER_FM.mp3',
+      genre: 'Türkçe Pop',
+    ),
+    RadioStation(
+      name: 'Joy FM',
+      url: 'https://17703.live.streamtheworld.com/JOY_FM.mp3',
+      genre: 'Slow / Chill',
+    ),
+    RadioStation(
+      name: 'Metro FM',
+      url: 'https://17733.live.streamtheworld.com/METRO_FM.mp3',
+      genre: 'Yabancı Pop',
+    ),
+    RadioStation(
+      name: 'Virgin Radio',
+      url: 'https://17733.live.streamtheworld.com/VIRGIN_RADIO.mp3',
+      genre: 'Hits',
+    ),
+  ];
 
   List<RadioStation> _stations = [];
   List<RadioStation> _filteredStations = [];
   final TextEditingController _searchController = TextEditingController();
 
-  // Yedek API sunucuları listesi
   final List<String> _apiHosts = [
     'https://de1.api.radio-browser.info',
     'https://nl1.api.radio-browser.info',
@@ -81,6 +113,9 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
   void initState() {
     super.initState();
     _audioPlayer = AudioPlayer();
+    _stations = List.from(_defaultStations);
+    _filteredStations = List.from(_defaultStations);
+    
     _initAudioPlayer();
     _loadBannerAd();
     _fetchRadioStations();
@@ -99,14 +134,12 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
   }
 
   Future<void> _fetchRadioStations() async {
-    bool success = false;
-    
     for (String host in _apiHosts) {
       try {
         final uri = Uri.parse(
-            '$host/json/stations/bycountry/turkey?limit=60&order=votes&reverse=true');
-        final response = await http.get(uri).timeout(const Duration(seconds: 5));
-        
+            '$host/json/stations/bycountry/turkey?limit=50&order=votes&reverse=true');
+        final response = await http.get(uri).timeout(const Duration(seconds: 4));
+
         if (response.statusCode == 200) {
           final List<dynamic> data = jsonDecode(response.body);
           final fetched = data
@@ -116,23 +149,16 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
 
           if (fetched.isNotEmpty && mounted) {
             setState(() {
-              _stations = fetched;
-              _filteredStations = fetched;
-              _isFetchingStations = false;
+              // Varsayılan radyolar ile internetten gelenleri birleştir
+              _stations = [..._defaultStations, ...fetched];
+              _filteredStations = List.from(_stations);
             });
-            success = true;
             break;
           }
         }
       } catch (_) {
-        // Sonraki sunucuyu dene
+        // Hata durumunda varsayılan liste kalır
       }
-    }
-
-    if (!success && mounted) {
-      setState(() {
-        _isFetchingStations = false;
-      });
     }
   }
 
@@ -181,7 +207,7 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Yayın yüklenemedi: $e')),
+          SnackBar(content: Text('Yayın çalınamadı: $e')),
         );
       }
     }
@@ -354,35 +380,31 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
           Container(
             height: 180,
             color: const Color(0xFF121216),
-            child: _isFetchingStations
-                ? const Center(child: CircularProgressIndicator(color: Color(0xFFFFBF00)))
-                : _filteredStations.isEmpty
-                    ? const Center(child: Text('Radyo bulunamadı'))
-                    : ListView.builder(
-                        itemCount: _filteredStations.length,
-                        itemBuilder: (context, index) {
-                          final station = _filteredStations[index];
-                          final isSelected = index == _selectedStationIndex;
-                          return ListTile(
-                            selected: isSelected,
-                            selectedTileColor: const Color(0xFF2A2A35),
-                            leading: Icon(
-                              Icons.radio,
-                              color: isSelected ? const Color(0xFFFFBF00) : Colors.grey,
-                            ),
-                            title: Text(
-                              station.name,
-                              style: TextStyle(
-                                color: isSelected ? const Color(0xFFFFBF00) : Colors.white,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                              ),
-                            ),
-                            subtitle: Text(station.genre,
-                                style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                            onTap: () => _playStation(index),
-                          );
-                        },
-                      ),
+            child: ListView.builder(
+              itemCount: _filteredStations.length,
+              itemBuilder: (context, index) {
+                final station = _filteredStations[index];
+                final isSelected = index == _selectedStationIndex;
+                return ListTile(
+                  selected: isSelected,
+                  selectedTileColor: const Color(0xFF2A2A35),
+                  leading: Icon(
+                    Icons.radio,
+                    color: isSelected ? const Color(0xFFFFBF00) : Colors.grey,
+                  ),
+                  title: Text(
+                    station.name,
+                    style: TextStyle(
+                      color: isSelected ? const Color(0xFFFFBF00) : Colors.white,
+                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                    ),
+                  ),
+                  subtitle: Text(station.genre,
+                      style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                  onTap: () => _playStation(index),
+                );
+              },
+            ),
           ),
           if (_isBannerAdLoaded && _bannerAd != null)
             SizedBox(
