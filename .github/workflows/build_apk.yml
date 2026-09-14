@@ -28,11 +28,57 @@ jobs:
           flutter-version: '3.x'
           channel: 'stable'
 
-      # Tam Android iskeletini oluşturur
+      # Android projesini sıfırdan üretir
       - name: Recreate Android Project
         run: |
           rm -rf android
           flutter create . --platforms=android --org=com.retroamp --project-name=retroamp
+
+      # RetroAmp İkonunu (Amber/Yeşil Equalizer Piksel Görseli) Kodla Oluşturur
+      - name: Generate Retro Dynamic Launcher Icon
+        run: |
+          python3 -c "
+          import os
+          from PIL import Image, ImageDraw
+
+          sizes = {
+              'mipmap-mdpi': 48,
+              'mipmap-hdpi': 72,
+              'mipmap-xhdpi': 96,
+              'mipmap-xxhdpi': 144,
+              'mipmap-xxxhdpi': 192
+          }
+
+          for folder, size in sizes.items():
+              path = f'android/app/src/main/res/{folder}'
+              os.makedirs(path, exist_ok=True)
+              
+              # Arka plan: Koyu Antrasit Metallic (#1E1E24)
+              img = Image.new('RGBA', (size, size), (30, 30, 36, 255))
+              draw = ImageDraw.Draw(img)
+              
+              # Dış Çerçeve (Amber/Altın)
+              border = max(2, size // 24)
+              draw.rectangle([border, border, size - border - 1, size - border - 1], outline=(255, 191, 0, 255), width=border)
+              
+              # Inner Screen (Siyah LCD)
+              margin = size // 6
+              draw.rectangle([margin, margin, size - margin, size - margin], fill=(13, 27, 30, 255))
+              
+              # Equalizer Barları (Retro Yeşil/Amber/Kırmızı)
+              bar_width = max(2, (size - 2 * margin) // 5)
+              heights = [0.4, 0.8, 0.6, 0.9]
+              colors = [(57, 255, 20), (255, 191, 0), (255, 191, 0), (255, 68, 68)]
+              
+              for i, (h, col) in enumerate(zip(heights, colors)):
+                  x0 = margin + i * bar_width + (bar_width // 4)
+                  x1 = x0 + (bar_width * 3 // 4)
+                  y1 = size - margin - 2
+                  y0 = y1 - int((size - 2 * margin - 4) * h)
+                  draw.rectangle([x0, y0, x1, y1], fill=col)
+              
+              img.save(f'{path}/ic_launcher.png')
+          "
 
       # İnternet erişimi ve HTTP yayın izinlerini AndroidManifest.xml dosyasında aktifleştirir
       - name: Enable Internet & Cleartext Traffic
