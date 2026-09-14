@@ -28,6 +28,12 @@ jobs:
           flutter-version: '3.x'
           channel: 'stable'
 
+      # Android platform klasörlerini Flutter v2 mimarisine uygun olarak sıfırdan otomatik üretir
+      - name: Recreate Android Project Skeleton
+        run: |
+          rm -rf android
+          flutter create . --platforms=android --org=com.retroamp --project-name=retroamp
+
       - name: Install Dependencies
         run: flutter pub get
 
