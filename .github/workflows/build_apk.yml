@@ -22,18 +22,22 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      # AGP 8 ile tam uyumlu Flutter 3.22.3 sürümüne sabitliyoruz
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.22.3'
           channel: 'stable'
 
-      # Android platform klasörlerini temiz ve kararlı bir şekilde üretir
+      # Android projesini oluşturur
       - name: Recreate Android Project
         run: |
           rm -rf android
           flutter create . --platforms=android --org=com.retroamp --project-name=retroamp
+
+      # Kotlin sürümünü uyumlu 1.9.24 versiyonuna yükseltir
+      - name: Upgrade Kotlin Gradle Plugin Version
+        run: |
+          sed -i 's/id "org.jetbrains.kotlin.android" version "[^"]*"/id "org.jetbrains.kotlin.android" version "1.9.24"/' android/settings.gradle || true
 
       # Python Pillow kütüphanesini yükler
       - name: Install Python Pillow
@@ -81,7 +85,7 @@ jobs:
               img.save(f'{path}/ic_launcher.png')
           "
 
-      # İnternet İzinleri, HTTP Radyo Akışları ve AdMob Kimliğini Ekleme
+      # İnternet İzinleri, HTTP Radyo Akışları ve AdMob Kimliği Ekleme
       - name: Enable Internet, Cleartext Traffic & AdMob
         run: |
           sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/>\n    <application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
