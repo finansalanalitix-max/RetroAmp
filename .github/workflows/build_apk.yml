@@ -28,13 +28,13 @@ jobs:
           flutter-version: '3.x'
           channel: 'stable'
 
-      # Android projesini sıfırdan üretir
+      # Android platform klasörlerini sıfırdan eksiksiz oluşturur
       - name: Recreate Android Project
         run: |
           rm -rf android
           flutter create . --platforms=android --org=com.retroamp --project-name=retroamp
 
-      # RetroAmp İkonunu (Amber/Yeşil Equalizer Piksel Görseli) Kodla Oluşturur
+      # RetroAmp İkonunu (Amber/Yeşil Equalizer Piksel Görseli) Otomatik Oluşturur
       - name: Generate Retro Dynamic Launcher Icon
         run: |
           python3 -c "
@@ -80,10 +80,11 @@ jobs:
               img.save(f'{path}/ic_launcher.png')
           "
 
-      # İnternet erişimi ve HTTP yayın izinlerini AndroidManifest.xml dosyasında aktifleştirir
-      - name: Enable Internet & Cleartext Traffic
+      # İnternet İzinleri, HTTP Radyo Akışları ve AdMob Kimliğini AndroidManifest'e Ekleme
+      - name: Enable Internet, Cleartext Traffic & AdMob
         run: |
           sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/>\n    <application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
+          sed -i 's/<\/application>/<meta-data android:name="com.google.android.gms.ads.APPLICATION_ID" android:value="ca-app-pub-3940256099942544~3347511713"\/>\n<\/application>/' android/app/src/main/AndroidManifest.xml
 
       - name: Install Dependencies
         run: flutter pub get
