@@ -28,6 +28,17 @@ jobs:
           flutter-version: '3.x'
           channel: 'stable'
 
+      # Tam Android iskeletini oluşturur
+      - name: Recreate Android Project
+        run: |
+          rm -rf android
+          flutter create . --platforms=android --org=com.retroamp --project-name=retroamp
+
+      # İnternet erişimi ve HTTP yayın izinlerini AndroidManifest.xml dosyasında aktifleştirir
+      - name: Enable Internet & Cleartext Traffic
+        run: |
+          sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/>\n    <application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
+
       - name: Install Dependencies
         run: flutter pub get
 
