@@ -1,5 +1,5 @@
 name: retroamp
-description: "A new Flutter project."
+description: "RetroAmp Radio Player"
 publish_to: 'none'
 
 version: 1.0.0+1
@@ -13,6 +13,7 @@ dependencies:
   cupertino_icons: ^1.0.6
   just_audio: ^0.9.36
   google_mobile_ads: ^5.0.0
+  http: ^1.2.1
 
 dev_dependencies:
   flutter_test:
