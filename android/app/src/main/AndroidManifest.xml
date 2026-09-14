@@ -35,3 +35,20 @@
             android:value="2" />
     </application>
 </manifest>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- BURA YENİ EKLENECEK: Internet İzinleri -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+
+    <application
+        android:label="retroamp"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true"> <!-- BURA YENİ EKLENECEK: HTTP İzni -->
+        
+        <activity
+            android:name=".MainActivity"
+            ... >
+        </activity>
+    </application>
+</manifest>
