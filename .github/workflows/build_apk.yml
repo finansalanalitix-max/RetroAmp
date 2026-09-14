@@ -28,17 +28,24 @@ jobs:
           flutter-version: '3.x'
           channel: 'stable'
 
-      # Android platform klasörlerini sıfırdan eksiksiz oluşturur
+      # Android platform klasörlerini sıfırdan oluşturur
       - name: Recreate Android Project
         run: |
           rm -rf android
           flutter create . --platforms=android --org=com.retroamp --project-name=retroamp
 
+      # AGP 9+ newDsl uyumsuzluğunu devre dışı bırakır
+      - name: Configure Gradle Properties for Legacy DSL Compatibility
+        run: |
+          echo "android.newDsl=false" >> android/gradle.properties
+          echo "android.useAndroidX=true" >> android/gradle.properties
+          echo "android.enableJetifier=true" >> android/gradle.properties
+
       # Python Pillow kütüphanesini yükler
       - name: Install Python Pillow
         run: python3 -m pip install Pillow
 
-      # RetroAmp İkonunu (Amber/Yeşil Equalizer Piksel Görseli) Otomatik Oluşturur
+      # RetroAmp İkonunu Otomatik Oluşturur
       - name: Generate Retro Dynamic Launcher Icon
         run: |
           python3 -c "
@@ -57,19 +64,15 @@ jobs:
               path = f'android/app/src/main/res/{folder}'
               os.makedirs(path, exist_ok=True)
               
-              # Arka plan: Koyu Antrasit Metallic (#1E1E24)
               img = Image.new('RGBA', (size, size), (30, 30, 36, 255))
               draw = ImageDraw.Draw(img)
               
-              # Dış Çerçeve (Amber/Altın)
               border = max(2, size // 24)
               draw.rectangle([border, border, size - border - 1, size - border - 1], outline=(255, 191, 0, 255), width=border)
               
-              # Inner Screen (Siyah LCD)
               margin = size // 6
               draw.rectangle([margin, margin, size - margin, size - margin], fill=(13, 27, 30, 255))
               
-              # Equalizer Barları (Retro Yeşil/Amber/Kırmızı)
               bar_width = max(2, (size - 2 * margin) // 5)
               heights = [0.4, 0.8, 0.6, 0.9]
               colors = [(57, 255, 20), (255, 191, 0), (255, 191, 0), (255, 68, 68)]
@@ -84,7 +87,7 @@ jobs:
               img.save(f'{path}/ic_launcher.png')
           "
 
-      # İnternet İzinleri, HTTP Radyo Akışları ve AdMob Kimliğini AndroidManifest'e Ekleme
+      # İnternet İzinleri, HTTP Radyo Akışları ve AdMob Kimliği Ekleme
       - name: Enable Internet, Cleartext Traffic & AdMob
         run: |
           sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/>\n    <application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
@@ -93,7 +96,7 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      # google_mobile_ads kütüphanesindeki çakışan yapılandırmayı tamamen kaldırır
+      # google_mobile_ads Gradle uyumsuz bloğunu kaldırır
       - name: Fix google_mobile_ads Gradle Issue
         run: |
           PUB_CACHE_DIR="$HOME/.pub-cache/hosted/pub.dev"
