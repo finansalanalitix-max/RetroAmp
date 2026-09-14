@@ -22,24 +22,18 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      # AGP 8 ile tam uyumlu Flutter 3.22.3 sürümüne sabitliyoruz
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          flutter-version: '3.22.3'
           channel: 'stable'
 
-      # Android platform klasörlerini sıfırdan oluşturur
+      # Android platform klasörlerini temiz ve kararlı bir şekilde üretir
       - name: Recreate Android Project
         run: |
           rm -rf android
           flutter create . --platforms=android --org=com.retroamp --project-name=retroamp
-
-      # AGP 9+ newDsl uyumsuzluğunu devre dışı bırakır
-      - name: Configure Gradle Properties for Legacy DSL Compatibility
-        run: |
-          echo "android.newDsl=false" >> android/gradle.properties
-          echo "android.useAndroidX=true" >> android/gradle.properties
-          echo "android.enableJetifier=true" >> android/gradle.properties
 
       # Python Pillow kütüphanesini yükler
       - name: Install Python Pillow
@@ -87,7 +81,7 @@ jobs:
               img.save(f'{path}/ic_launcher.png')
           "
 
-      # İnternet İzinleri, HTTP Radyo Akışları ve AdMob Kimliği Ekleme
+      # İnternet İzinleri, HTTP Radyo Akışları ve AdMob Kimliğini Ekleme
       - name: Enable Internet, Cleartext Traffic & AdMob
         run: |
           sed -i 's/<application/<uses-permission android:name="android.permission.INTERNET"\/>\n    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"\/>\n    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"\/>\n    <application android:usesCleartextTraffic="true"/' android/app/src/main/AndroidManifest.xml
@@ -95,12 +89,6 @@ jobs:
 
       - name: Install Dependencies
         run: flutter pub get
-
-      # google_mobile_ads Gradle uyumsuz bloğunu kaldırır
-      - name: Fix google_mobile_ads Gradle Issue
-        run: |
-          PUB_CACHE_DIR="$HOME/.pub-cache/hosted/pub.dev"
-          find "$PUB_CACHE_DIR" -path "*/google_mobile_ads-*/android/build.gradle" -exec sed -i '/configurations\.all/,/}/d' {} + || true
 
       - name: Build APK (Release)
         run: flutter build apk --release --no-tree-shake-icons
