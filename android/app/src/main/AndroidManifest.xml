@@ -1,13 +1,15 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.retroamp">
-    
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- İnternet Erişim İzinleri -->
     <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
 
+    <!-- android:usesCleartextTraffic="true" eklenerek HTTP radyo akışlarına izin verildi -->
     <application
         android:label="RetroAmp"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true">
         
         <activity
             android:name=".MainActivity"
@@ -28,7 +30,6 @@
             </intent-filter>
         </activity>
 
-        <!-- Android v2 embedding zorunlu ayarı -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
