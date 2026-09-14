@@ -93,6 +93,12 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
+      # google_mobile_ads kütüphanesindeki Gradle uyumsuzluğunu düzeltme
+      - name: Fix google_mobile_ads Gradle Issue
+        run: |
+          PUB_CACHE_DIR="$HOME/.pub-cache/hosted/pub.dev"
+          find "$PUB_CACHE_DIR" -path "*/google_mobile_ads-*/android/build.gradle" -exec sed -i 's/configurations\.all/configurations\.configureEach/g' {} + || true
+
       - name: Build APK (Release)
         run: flutter build apk --release --no-tree-shake-icons
 
