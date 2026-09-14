@@ -39,7 +39,9 @@ class RadioStation {
 
   factory RadioStation.fromJson(Map<String, dynamic> json) {
     return RadioStation(
-      name: json['name'] ?? 'Bilinmeyen Radyo',
+      name: json['name'] != null && json['name'].toString().trim().isNotEmpty
+          ? json['name'].toString().trim()
+          : 'İsimsiz Radyo',
       url: json['url_resolved'] ?? json['url'] ?? '',
       genre: (json['tags'] != null && json['tags'].toString().isNotEmpty)
           ? json['tags'].toString().split(',').first
@@ -68,6 +70,13 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
   List<RadioStation> _filteredStations = [];
   final TextEditingController _searchController = TextEditingController();
 
+  // Yedek API sunucuları listesi
+  final List<String> _apiHosts = [
+    'https://de1.api.radio-browser.info',
+    'https://nl1.api.radio-browser.info',
+    'https://at1.api.radio-browser.info',
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -89,33 +98,41 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
     });
   }
 
-  // Radio Browser API üzerinden Türkiye radyolarını çekme
   Future<void> _fetchRadioStations() async {
-    final url = Uri.parse(
-        'https://de1.api.radio-browser.info/json/stations/bycountry/turkey?limit=50&order=votes&reverse=true');
-    try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        final fetched = data
-            .map((item) => RadioStation.fromJson(item))
-            .where((station) => station.url.isNotEmpty)
-            .toList();
+    bool success = false;
+    
+    for (String host in _apiHosts) {
+      try {
+        final uri = Uri.parse(
+            '$host/json/stations/bycountry/turkey?limit=60&order=votes&reverse=true');
+        final response = await http.get(uri).timeout(const Duration(seconds: 5));
+        
+        if (response.statusCode == 200) {
+          final List<dynamic> data = jsonDecode(response.body);
+          final fetched = data
+              .map((item) => RadioStation.fromJson(item))
+              .where((station) => station.url.isNotEmpty && station.name != 'İsimsiz Radyo')
+              .toList();
 
-        setState(() {
-          _stations = fetched;
-          _filteredStations = fetched;
-          _isFetchingStations = false;
-        });
-      } else {
-        throw Exception('Radyolar yüklenemedi');
+          if (fetched.isNotEmpty && mounted) {
+            setState(() {
+              _stations = fetched;
+              _filteredStations = fetched;
+              _isFetchingStations = false;
+            });
+            success = true;
+            break;
+          }
+        }
+      } catch (_) {
+        // Sonraki sunucuyu dene
       }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isFetchingStations = false;
-        });
-      }
+    }
+
+    if (!success && mounted) {
+      setState(() {
+        _isFetchingStations = false;
+      });
     }
   }
 
