@@ -1,8 +1,6 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:http/http.dart' as http;
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,18 +34,6 @@ class RadioStation {
   final String genre;
 
   RadioStation({required this.name, required this.url, required this.genre});
-
-  factory RadioStation.fromJson(Map<String, dynamic> json) {
-    return RadioStation(
-      name: json['name'] != null && json['name'].toString().trim().isNotEmpty
-          ? json['name'].toString().trim()
-          : 'İsimsiz Radyo',
-      url: json['url_resolved'] ?? json['url'] ?? '',
-      genre: (json['tags'] != null && json['tags'].toString().isNotEmpty)
-          ? json['tags'].toString().split(',').first
-          : 'Genel',
-    );
-  }
 }
 
 class RetroAmpPlayer extends StatefulWidget {
@@ -65,8 +51,8 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
   bool _isLoading = false;
   int _selectedStationIndex = 0;
 
-  // Varsayılan / Standart Yayın Yapan Radyolar
-  final List<RadioStation> _defaultStations = [
+  // Garantili Canlı Radyo İstasyonları Listesi
+  final List<RadioStation> _allStations = [
     RadioStation(
       name: 'Power FM',
       url: 'https://powerfm.listenpowerapp.com/powerfm/mpeg/icecast.audio',
@@ -97,28 +83,28 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
       url: 'https://17733.live.streamtheworld.com/VIRGIN_RADIO.mp3',
       genre: 'Hits',
     ),
+    RadioStation(
+      name: 'Alem FM',
+      url: 'https://turkmedya.streamboss.co/alemfm/alemfm.stream/playlist.m3u8',
+      genre: 'Türkçe Pop',
+    ),
+    RadioStation(
+      name: 'Radyo D',
+      url: 'https://demiroren.live.streamtheworld.com/RADIOD.mp3',
+      genre: 'Karma',
+    ),
   ];
 
-  List<RadioStation> _stations = [];
   List<RadioStation> _filteredStations = [];
   final TextEditingController _searchController = TextEditingController();
-
-  final List<String> _apiHosts = [
-    'https://de1.api.radio-browser.info',
-    'https://nl1.api.radio-browser.info',
-    'https://at1.api.radio-browser.info',
-  ];
 
   @override
   void initState() {
     super.initState();
     _audioPlayer = AudioPlayer();
-    _stations = List.from(_defaultStations);
-    _filteredStations = List.from(_defaultStations);
-    
+    _filteredStations = List.from(_allStations);
     _initAudioPlayer();
     _loadBannerAd();
-    _fetchRadioStations();
   }
 
   void _initAudioPlayer() {
@@ -133,41 +119,12 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
     });
   }
 
-  Future<void> _fetchRadioStations() async {
-    for (String host in _apiHosts) {
-      try {
-        final uri = Uri.parse(
-            '$host/json/stations/bycountry/turkey?limit=50&order=votes&reverse=true');
-        final response = await http.get(uri).timeout(const Duration(seconds: 4));
-
-        if (response.statusCode == 200) {
-          final List<dynamic> data = jsonDecode(response.body);
-          final fetched = data
-              .map((item) => RadioStation.fromJson(item))
-              .where((station) => station.url.isNotEmpty && station.name != 'İsimsiz Radyo')
-              .toList();
-
-          if (fetched.isNotEmpty && mounted) {
-            setState(() {
-              // Varsayılan radyolar ile internetten gelenleri birleştir
-              _stations = [..._defaultStations, ...fetched];
-              _filteredStations = List.from(_stations);
-            });
-            break;
-          }
-        }
-      } catch (_) {
-        // Hata durumunda varsayılan liste kalır
-      }
-    }
-  }
-
   void _filterStations(String query) {
     setState(() {
       if (query.isEmpty) {
-        _filteredStations = _stations;
+        _filteredStations = List.from(_allStations);
       } else {
-        _filteredStations = _stations
+        _filteredStations = _allStations
             .where((station) =>
                 station.name.toLowerCase().contains(query.toLowerCase()) ||
                 station.genre.toLowerCase().contains(query.toLowerCase()))
@@ -207,7 +164,7 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Yayın çalınamadı: $e')),
+          SnackBar(content: Text('Yayın bağlantısı kurulamadı: $e')),
         );
       }
     }
@@ -277,7 +234,7 @@ class _RetroAmpPlayerState extends State<RetroAmpPlayer> {
                     child: Column(
                       children: [
                         Text(
-                          currentStation?.name ?? 'Radyo Seçilmedi',
+                          currentStation?.name ?? 'Radyo Seçin',
                           style: const TextStyle(
                             color: Color(0xFF39FF14),
                             fontSize: 22,
